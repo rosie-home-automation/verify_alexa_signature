@@ -9,11 +9,11 @@ var SIGNATURE_CERT_URL_REGEX = new RegExp('^https://s3\.amazonaws\.com(:443)?\/e
 
 var VerifyAlexaSignature = {
   certs: {},
-  verify: function(signature, signatureCertUrl, body) {
+  verify: function(signature, signatureCertChainUrl, body) {
     var self = this
     var deferred = Promise.pending()
 
-    self.getCert(signatureCertUrl)
+    self.getCert(signatureCertChainUrl)
       .then(function(cert) {
         if (!self.validateCert(cert)) {
           deferred.reject('Invalid certificate.')
@@ -31,23 +31,24 @@ var VerifyAlexaSignature = {
 
     return deferred
   },
-  getCert: function(signatureCertUrl) {
+  getCert: function(signatureCertChainUrl) {
     var deferred = Promise.pending()
 
-    if (this.certs[signatureCertUrl]) {
-      deferred.resolve(this.certs[signatureCertUrl])
+    var url = NormalizeUrl(signatureCertChainUrl)
+    if (this.certs[url]) {
+      deferred.resolve(this.certs[url])
     }
-    else if (!this.validCertUrl(signatureCertUrl)) {
+    else if (!this.validCertUrl(url)) {
       deferred.reject('Invalid certificate URL.')
     }
     else {
-      Request(signatureCertUrl).spread(function(response, body) {
+      Request(url).spread(function(response, body) {
         if (response.statusCode != 200) {
           deferred.reject('Non 200 response downloading certificate.')
         }
         else {
           var cert = X509.parseCert(body)
-          this.certs[signatureCertUrl] = cert
+          this.certs[url] = cert
           deferred.resolve(cert)
         }
       })
@@ -76,8 +77,8 @@ var VerifyAlexaSignature = {
     }
     return true
   },
-  validCertUrl: function(signatureCertUrl) {
-    return SIGNATURE_CERT_URL_REGEX.test(signatureCertUrl)
+  validCertUrl: function(signatureCertChainUrl) {
+    return SIGNATURE_CERT_URL_REGEX.test(signatureCertChainUrl)
   },
   purgeCerts: function() {
     this.certs = {}
