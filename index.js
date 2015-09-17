@@ -3,7 +3,7 @@
 let Promise = require('bluebird')
 let Crypto = require('crypto')
 let NormalizeUrl = require('normalizeurl')
-let Request = Promise.promisify(request('request'))
+let Request = Promise.promisify(require('request'))
 let X509 = require('x509')
 
 const SUBJECT_ALTERNATIVE_NAME = 'DNS:echo-api.amazon.com'
