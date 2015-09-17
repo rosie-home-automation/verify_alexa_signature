@@ -1,3 +1,5 @@
+'use strict'
+
 let Promise = require('bluebird')
 let Crypto = require('crypto')
 let NormalizeUrl = require('normalizeurl')
