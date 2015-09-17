@@ -1,5 +1,5 @@
 {
-  "name": "alexa_verify_signature",
+  "name": "verify_alexa_signature",
   "version": "0.1.0",
   "description": "Verify Alexa requests using the signature, signature cert url, and request body.",
   "author": "Scott Olson",
