@@ -55,19 +55,19 @@ let VerifyAlexaSignature = {
     if (Math.abs(date - body.request.timestamp) / 1000 > 150) { // timestamp is within 150 seconds of our time
       return false
     }
-    let publicKey = cert.publicKey.n
+    let publicKey = cert.publicKey
     let verifier = Crypto.createVerify('SHA1')
     verifier.update(JSON.stringify(body))
-    return verifier.verify(data, signature, 'base64')
+    return verifier.verify(publicKey, signature, 'base64')
   },
   validateCert (cert) {
     let date = new Date()
     if (cert.notBefore > date || cert.notAfter < date) {
-      return false
+      throw 'Invalid certificate: expired certificate'
     }
     let san = cert.extensions.subjectAlternativeName
     if (san !== SUBJECT_ALTERNATIVE_NAME) {
-      return false
+      throw 'Invalid certificate: invalid subject alternative name'
     }
     return true
   },
