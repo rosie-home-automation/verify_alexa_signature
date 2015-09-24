@@ -55,10 +55,10 @@ let VerifyAlexaSignature = {
     if (Math.abs(date - body.request.timestamp) / 1000 > 150) { // timestamp is within 150 seconds of our time
       return false
     }
-    let publicKey = cert.publicKey
+    let publicKey = new Buffer(cert.publicKey.n, 'hex')
     let verifier = Crypto.createVerify('SHA1')
     verifier.update(JSON.stringify(body))
-    return verifier.verify(publicKey, signature, 'base64')
+    return verifier.verify(publicKey, signature, 'utf8')
   },
   validateCert (cert) {
     let date = new Date()
