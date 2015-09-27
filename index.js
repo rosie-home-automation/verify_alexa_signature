@@ -1,86 +1,80 @@
-var Promise = require('bluebird')
-var Crypto = require('crypto')
-var NormalizeUrl = require('normalizeurl')
-var Request = Promise.promisify(request('request'))
-var X509 = require('x509')
+'use strict'
 
-var SUBJECT_ALTERNATIVE_NAME = 'DNS:echo-api.amazon.com'
-var SIGNATURE_CERT_URL_REGEX = new RegExp('^https://s3\.amazonaws\.com(:443)?\/echo.api\/')
+let Promise = require('bluebird')
+let Crypto = require('crypto')
+let NormalizeUrl = require('normalizeurl')
+let Request = Promise.promisify(require('request'))
+let X509 = require('x509')
 
-var VerifyAlexaSignature = {
+const SUBJECT_ALTERNATIVE_NAME = 'DNS:echo-api.amazon.com'
+const SIGNATURE_CERT_URL_REGEX = new RegExp('^https://s3\.amazonaws\.com(:443)?\/echo.api\/')
+
+let VerifyAlexaSignature = {
   certs: {},
-  verify: function(signature, signatureCertChainUrl, body) {
-    var self = this
-    var deferred = Promise.pending()
-
-    self.getCert(signatureCertChainUrl)
-      .then(function(cert) {
-        if (!self.validateCert(cert)) {
-          deferred.reject('Invalid certificate.')
-        }
-        else if (!self.validateBody(cert, signature, body)) {
-          deferred.reject('Invalid signature.')
-        }
-        else {
-          deferred.resolve('Valid signature.')
-        }
-      })
-      .catch(function(err) {
-        deferred.reject(err)
-      })
-
-    return deferred
+  verify (signature, signatureCertChainUrl, body) {
+    return new Promise((reject, resolve) => {
+        this.getCert(signatureCertChainUrl)
+          .then((cert) => {
+            if (!this.validateCert(cert)) {
+              reject('Invalid certificate.')
+            }
+            else if (!this.validateBody(cert, signature, body)) {
+              reject('Invalid signature.')
+            }
+            else {
+              resolve('Valid signature.')
+            }
+          })
+    })
   },
-  getCert: function(signatureCertChainUrl) {
-    var deferred = Promise.pending()
-
-    var url = NormalizeUrl(signatureCertChainUrl)
-    if (this.certs[url]) {
-      deferred.resolve(this.certs[url])
-    }
-    else if (!this.validCertUrl(url)) {
-      deferred.reject('Invalid certificate URL.')
-    }
-    else {
-      Request(url).spread(function(response, body) {
-        if (response.statusCode != 200) {
-          deferred.reject('Non 200 response downloading certificate.')
-        }
-        else {
-          var cert = X509.parseCert(body)
-          this.certs[url] = cert
-          deferred.resolve(cert)
-        }
-      })
-    }
-
-    return deferred.promise
+  getCert (signatureCertChainUrl) {
+    return new Promise((resolve, reject) => {
+      let url = NormalizeUrl(signatureCertChainUrl)
+      if (this.certs[url]) {
+        resolve(this.certs[url])
+      }
+      else if (!this.validCertUrl(url)) {
+        reject('Invalid certificate URL.')
+      }
+      else {
+        Request(url).spread((response, body) => {
+          if (response.statusCode != 200) {
+            reject('Non 200 response downloading certificate.')
+          }
+          else {
+            let cert = X509.parseCert(body)
+            this.certs[url] = cert
+            resolve(cert)
+          }
+        })
+      }
+    })
   },
-  validateBody: function(cert, signature, body) {
-    var date = new Date()
+  validateBody (cert, signature, body) {
+    let date = new Date()
     if (Math.abs(date - body.request.timestamp) / 1000 > 150) { // timestamp is within 150 seconds of our time
       return false
     }
-    var publicKey = cert.publicKey.n
-    var verifier = Crypto.createVerify('SHA1')
+    let publicKey = new Buffer(cert.publicKey.n, 'hex')
+    let verifier = Crypto.createVerify('SHA1')
     verifier.update(JSON.stringify(body))
-    return verifier.verify(data, signature, 'base64')
+    return verifier.verify(publicKey, signature, 'utf8')
   },
-  validateCert: function(cert) {
-    var date = new Date()
+  validateCert (cert) {
+    let date = new Date()
     if (cert.notBefore > date || cert.notAfter < date) {
-      return false
+      throw 'Invalid certificate: expired certificate'
     }
-    var san = cert.extensions.subjectAlternativeName
+    let san = cert.extensions.subjectAlternativeName
     if (san !== SUBJECT_ALTERNATIVE_NAME) {
-      return false
+      throw 'Invalid certificate: invalid subject alternative name'
     }
     return true
   },
-  validCertUrl: function(signatureCertChainUrl) {
+  validCertUrl (signatureCertChainUrl) {
     return SIGNATURE_CERT_URL_REGEX.test(signatureCertChainUrl)
   },
-  purgeCerts: function() {
+  purgeCerts () {
     this.certs = {}
   }
 }
